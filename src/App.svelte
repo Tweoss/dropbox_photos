@@ -1,67 +1,63 @@
 <script lang="ts">
-    export let ACCESS_TOKEN: string;
-    import { DbxIndex, DbxImage, FileType } from "./dbx_classes";
-    import Image from "./Image.svelte";
+    import { DbxIndex, DbxIndexEntry } from "./dbx_classes";
+    import Event from "./Event.svelte";
+    import Button from "./Button.svelte";
+    import { store } from "./store.js";
+    import { get } from "svelte/store";
 
     // array of events
-    // events are arrays of file names, data, and timestamps
-    let image_datas: ([string, string, string] | null)[][] = [];
-    let index = new DbxIndex(ACCESS_TOKEN);
-    // build index
-    index.build_index().then(() => {
-        // collapse video and images for live photos
-        index.collapse_index();
-        let event_array = index.get_sorted_event_array();
-        // make image_datas have arrays that are the same length as the event_array
-        image_datas = [...event_array.map((event) => Array(event.length))];
-        // fetch and place the image thumbnail data into image_datas
-        event_array.forEach((event, i) => {
-            event.forEach(([name, time], j) => {
-                const entry = index.entries.get(name);
-                if (entry.metadata.filetype === FileType.Image) {
-                    const image = new DbxImage(entry.metadata.path);
-                    image.loadThumbnail(ACCESS_TOKEN).then((data: string) => {
-                        image_datas[i][j] = [entry.metadata.name, data, time];
-                        // image_datas = image_datas;
-                    });
-                } else {
-                    // handle videos
-                    alert("HANDLE VIDEOS HERE");
-                }
+    // events are arrays of index entries
+    let events_entries: (DbxIndexEntry | null)[][] = [];
+    let index = new DbxIndex();
+    index
+        // check that the token in the index is valid
+        .valid_token_set(window.location.href)
+        // if not valid, redirect to dropbox authentication
+        .then((result) =>
+            result ? 0 : index.redirect_to_auth(window.location)
+        )
+        .then(() => {
+            console.log(index);
+            // build index
+            index.build_index().then(() => {
+                // collapse video and images for live photos
+                index.collapse_index();
+                events_entries = index.get_sorted_event_array();
             });
         });
-        console.log(image_datas);
-    });
 </script>
 
+<svelte:window
+    on:keydown="{(e) =>
+        store.set(index.handle_keydown(e, get(store), events_entries))}"
+/>
+
 <main>
-    <h1>Hello {ACCESS_TOKEN}!</h1>
-    {#each image_datas as event}
-        {#if event[0] != null}
-            <h2>{event[0][2]}</h2>
-        {/if}
-        {#each event as element}
-            {#if element}
-                <img alt="{element[0]}" src="{element[1]}" />
-            {:else}
-                <img src="placeholder.png" alt="placeholder" />
-                <!-- {#if index.entries.entries().next().value}
-                    <h1>Test</h1>
-                    <Image
-                        image_entry="{index.entries.entries().next().value[1]}"
-                        default_data="./placeholder.png"
-                    />
-                {/if} -->
-            {/if}
-        {/each}
+    <!-- font-awesome icons -->
+    <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
+    />
+    <h1>🐟 Photos 🐈</h1>
+    <Button />
+    {#each events_entries as event, event_index}
+        <Event
+            ACCESS_TOKEN="{index.access_token}"
+            event_contents="{event}"
+            event_index="{event_index}"
+        />
     {/each}
+    {#if $store.file_info}
+        <div>
+            <p>HI</p>
+        </div>
+    {/if}
 </main>
 
 <style>
     main {
         text-align: center;
         padding: 1em;
-        max-width: 240px;
         margin: 0 auto;
     }
 
@@ -72,9 +68,7 @@
         font-weight: 100;
     }
 
-    @media (min-width: 640px) {
-        main {
-            max-width: none;
-        }
+    :global(body) {
+        background-color: #202020;
     }
 </style>

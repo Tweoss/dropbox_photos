@@ -1,6 +1,7 @@
 export {
     DbxIndex,
     DbxImage,
+    DbxMetadata,
     FileType,
     DbxIndexEntry
 }
@@ -17,7 +18,7 @@ class DbxImage {
      */
     async loadThumbnail(
         access_token: string,
-        size = "w256h256"
+        size = "w64h64"
     ): Promise<string | ArrayBuffer> {
         const response = await fetch(
             "https://content.dropboxapi.com/2/files/get_thumbnail_v2",
@@ -30,35 +31,40 @@ class DbxImage {
             }
         );
         const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
+        return URL.createObjectURL(blob);
     }
 
     /**
      * returns a promise that resolves to an image
      */
-    async loadImage(access_token: string): Promise<string | ArrayBuffer> {
-        const response = await fetch(
-            "https://content.dropboxapi.com/2/files/get_thumbnail_v2",
-            {
-                method: "POST",
+    async loadImage(access_token: string): Promise<string> {
+        const response = await
+            fetch('https://content.dropboxapi.com/2/files/download', {
+                method: 'POST',
                 headers: {
-                    Authorization: `Bearer ${access_token}`,
-                    "Dropbox-API-Arg": `{"resource":{".tag":"path","path":"${this.path}"},"size":{".tag":"${this.size}"}}`,
-                },
-            }
-        );
+                    'Authorization': `Bearer ${access_token}`,
+                    'Dropbox-API-Arg': `{"path":"${this.path}"}`
+                }
+            });
         const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result);
-            reader.onerror = reject;
-            reader.readAsDataURL(blob);
-        });
+        return URL.createObjectURL(blob);
+
+    }
+
+    /**
+     * returns a promise that resolves to a URL for the video blob (if the photo is a live photo)
+     */
+    async loadVideo(access_token: string, video_path: string): Promise<string> {
+        const response = await
+            fetch('https://content.dropboxapi.com/2/files/download', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${access_token}`,
+                    'Dropbox-API-Arg': `{"path":"${video_path}"}`
+                }
+            });
+        const blob = await response.blob();
+        return URL.createObjectURL(blob);
     }
 }
 
@@ -74,6 +80,7 @@ class DbxMetadata {
     time_taken: string;
     filetype: FileType | null;
     duration: string | null;
+    dimensions: { width: number; height: number } | null = null;
 
     constructor(path: string) {
         this.path = path;
@@ -101,6 +108,7 @@ class DbxMetadata {
         this.name = json.name;
         this.last_modified = json.server_modified;
         this.time_taken = json.media_info.metadata.time_taken;
+        this.dimensions = json.media_info.metadata.dimensions;
         if (json.media_info.metadata[".tag"] === "video") {
             this.filetype = FileType.Video;
             this.duration = json.media_info.metadata.duration;
@@ -114,6 +122,7 @@ class DbxMetadata {
 class DbxIndexEntry {
     metadata: DbxMetadata;
     live_video_metadata: DbxMetadata | null;
+    is_selected: boolean = false;
 
     constructor() {
         this.metadata = null;
@@ -135,15 +144,45 @@ class DbxIndexEntry {
 }
 
 class DbxIndex {
-    access_token: string;
+    access_token: string | null;
 
     // name to entry
     entries: Map<string, DbxIndexEntry>;
-    constructor(access_token: string) {
-        /** @type {string} */
-        this.access_token = access_token;
+    constructor() {
         /** @type {Map<String, DbxIndexEntry>} */
         this.entries = new Map();
+    }
+
+    /**
+     * parse and check url for access token
+     */
+    async valid_token_set(url: string, custom_token?: string) {
+        const token: string = custom_token || url.split('#')[1]?.split('&')[0]?.split('=')[1];
+
+        if (token) {
+            return fetch('https://api.dropboxapi.com/2/check/user', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({})
+            }).then(res => {
+                if (res.status == 200) {
+                    this.access_token = token;
+                    return true;
+                }
+            })
+        } else {
+            return Promise.resolve(false);
+        }
+    }
+
+    /**
+     * redirect to dropbox's authentication for obtaining an access token
+     */
+    redirect_to_auth(location: Location) {
+        location.href = `https://www.dropbox.com/oauth2/authorize?client_id=9a3dfm0r2xv45sq&response_type=token&redirect_uri=${location.protocol}//${location.host + location.pathname}`
     }
 
     /**
@@ -218,7 +257,7 @@ class DbxIndex {
     /**
      * returns an array of arrays of string file names 
      */
-    get_sorted_event_array(): [string, string][][] {
+    get_sorted_event_array(): DbxIndexEntry[][] {
 
         // check if two metadatas are within 8 hours of one another
         const same_event = (a: Date, b: Date): boolean => {
@@ -231,21 +270,63 @@ class DbxIndex {
         // create events
         let current_event = 0;
         let events = [];
+        let dates = [];
         for (let i = 0; i < sorted.length; i++) {
             const name = sorted[i];
             const entry = this.entries.get(name);
-            if (events[current_event] && events[current_event][0]) {
+            if (events[current_event]) {
                 const date = new Date(entry.metadata.time_taken);
-                if (same_event(date, events[current_event][0][1])) {
-                    events[current_event].push([name, date]);
+                if (same_event(date, dates[current_event][0])) {
+                    events[current_event].push(entry);
+                    dates[current_event].push(date);
                 } else {
                     current_event += 1;
-                    events[current_event] = [[name, new Date(entry.metadata.time_taken)]];
+                    events[current_event] = [entry];
+                    dates[current_event] = [new Date(entry.metadata.time_taken)];
                 }
             } else {
-                events[current_event] = [[name, new Date(entry.metadata.time_taken)]];
+                events[current_event] = [entry];
+                dates[current_event] = [new Date(entry.metadata.time_taken)];
             }
         }
         return events;
+    }
+
+    handle_keydown(event: KeyboardEvent, store, entries: (DbxIndexEntry | null)[][]): { event_index: number; entry_index: number; maximized: boolean; file_info: boolean; } {
+        let output: { event_index: number; entry_index: number; maximized: boolean; file_info: boolean; } = store;
+        const prevent_default = (event: KeyboardEvent) => {
+            event.preventDefault();
+            event.stopPropagation();
+        };
+        if (event.key == "ArrowLeft") {
+            output.entry_index == 0 ?
+                output.event_index == 0 ?
+                    null
+                    :
+                    (output.event_index -= 1, output.entry_index = entries[output.event_index].length - 1)
+                :
+                output.entry_index -= 1;
+            prevent_default(event);
+        } else if (event.key == "ArrowRight") {
+            output.entry_index == entries[output.event_index]?.length - 1 ?
+                output.event_index == entries.length - 1 ?
+                    null
+                    :
+                    (output.event_index += 1, output.entry_index = 0)
+                :
+                output.entry_index += 1;
+            prevent_default(event);
+        } else if (event.key == "ArrowUp") {
+            output.file_info = true;
+            prevent_default(event);
+        } else if (event.key == "ArrowDown") {
+            output.file_info = false;
+            prevent_default(event);
+        } else if (event.key == " ") {
+            output.maximized = !output.maximized;
+            prevent_default(event);
+        }
+
+        return output;
     }
 }
