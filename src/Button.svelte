@@ -11,7 +11,7 @@
         )
             show_button = false;
     })(navigator.userAgent || navigator.vendor);
-    let button_text = "Click me to enable video!";
+    let button_text = "Interact to enable video!";
     const clickHandler = () => {
         button_text = "Enabled!";
         setTimeout(() => {
@@ -19,6 +19,11 @@
         }, 1000);
     };
 </script>
+
+<svelte:window
+    on:click="{(_) => clickHandler()}"
+    on:keydown="{(_) => clickHandler()}"
+/>
 
 {#if show_button}
     <button on:click="{clickHandler}">{button_text} </button>
