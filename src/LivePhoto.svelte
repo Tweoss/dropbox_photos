@@ -17,6 +17,7 @@
     let thumbnail: string;
 
     let selected: boolean = false;
+    let maximized: boolean = false;
 
     const image = new DbxImage(image_entry.metadata.path);
     let calculated_dimensions: {
@@ -95,25 +96,17 @@
         observer.observe(element);
     });
     store.subscribe((store) => {
-        const was_previously_selected = selected;
         selected =
             store.event_index == event_index &&
             store.entry_index == entry_index;
-        // if (store.maximized && was_previously_selected && selected) {
-        //     const parentElement = element.parentElement;
-        //     parentElement.style.position = 'fixed';
-        //     parentElement.style.width = '100%';
-        //     parentElement.style.height = '100%';
-        //     parentElement.style.top = '0px';
-        //     parentElement.style.left = '0px';
-        //     // element.style.top = '0px';
-        //     // element.style.left = '0px';
-        //     parentElement.style.margin = '0px';
-        //     parentElement.style.zIndex = '1';
-        // }
-        if (selected && !was_previously_selected) {
-            //     $store.event_index == event_index &&
-            // $store.entry_index == entry_index
+        // only if it is selected and maximized now
+        if (store.maximized && selected) {
+            maximized = true;
+            element.play();
+        } else {
+            maximized = false;
+        }
+        if (selected) {
             element.scrollIntoView({ behavior: "smooth", block: "center" });
             full_image
                 ? (image_data = full_image)
@@ -132,33 +125,52 @@
         bind:this="{element}"
         src="{video_data}"
         poster="{image_data}"
-        class="{selected ? 'selected' : ''} {calculated_dimensions.scale_class}"
+        class="{selected
+            ? 'selected'
+            : ''} {calculated_dimensions.scale_class} {maximized
+            ? 'maximized'
+            : ''}"
         on:load|once="{() => {
             URL.revokeObjectURL(video_data);
-            URL.revokeObjectURL(image_data) /* no need for image_data anyway */;
+            URL.revokeObjectURL(image_data); // no need for image_data anyway
         }}"
-        on:focus="{() => element.play()}"
-        on:mouseover="{() => element.play()}"
+        on:focus="{() => {
+            maximized ? null : element.play();
+        }}"
+        on:mouseover="{() => {
+            maximized ? null : element.play().then(() => {}, () => {/* ignore the failure to play */});
+        }}"
         on:mouseleave="{() => {
-            element.pause();
-            element.currentTime = 0;
-            element.load();
+            if (!maximized) {
+                element.pause();
+                element.currentTime = 0;
+                element.load();
+            }
         }}"
         on:click="{() => {
-            store.update((previous) => {
-                previous.event_index = event_index;
-                previous.entry_index = entry_index;
-                return previous;
-            });
+            maximized
+                ? null
+                : store.update((previous) => {
+                      previous.event_index = event_index;
+                      previous.entry_index = entry_index;
+                      return previous;
+                  });
         }}"
-        style="top: {calculated_dimensions.top}%; left: {calculated_dimensions.left}%;"
+        style="top: {maximized
+            ? '0'
+            : calculated_dimensions.top}%; left: {maximized
+            ? '0'
+            : calculated_dimensions.left}%;"
+        controls="{maximized || null}"
     >
         Sorry, your browser doesn't support embedded videos.
     </video>
 
     <i
         style="top: {calculated_dimensions.top}%; left: {calculated_dimensions.left}%; color: lightgray;"
-        class="{element ? 'fa fa-play-circle-o ' : ''}"></i>
+        class="{element ? 'fa fa-play-circle-o ' : ''} {maximized
+            ? 'hidden'
+            : ''}"></i>
 </div>
 
 <style>
@@ -168,7 +180,6 @@
         width: 200px;
         display: inline-block;
         margin: 0.5em;
-        transition: width 2s, height 2s, top 2s, left 2s;
     }
     video {
         position: absolute;
@@ -179,14 +190,31 @@
         object-fit: contain;
         box-shadow: 3px 3px 10px black;
     }
+    video:hover {
+        box-shadow: 6px 6px 15px black;
+    }
     video.selected {
         border: 2px solid blue;
         border-radius: 2px;
         margin: -2px;
-        box-shadow: 6px 6px 15px black;
+        box-shadow: 6px 6px 20px black;
+    }
+    video.maximized {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        background-color: #222c;
+        border: none;
+        margin: 0px;
     }
     i {
         position: absolute;
+    }
+    i.hidden {
+        display: none;
     }
     .width-auto {
         width: auto;

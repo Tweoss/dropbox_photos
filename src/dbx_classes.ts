@@ -182,7 +182,7 @@ class DbxIndex {
      * redirect to dropbox's authentication for obtaining an access token
      */
     redirect_to_auth(location: Location) {
-        location.href = `https://www.dropbox.com/oauth2/authorize?client_id=9a3dfm0r2xv45sq&response_type=token&redirect_uri=${location.protocol}//${location.host + location.pathname}`
+        location.href = `https://www.dropbox.com/oauth2/authorize?client_id=nyma8gjtfb5kq8n&response_type=token&redirect_uri=${location.protocol}//${location.host + location.pathname}`
     }
 
     /**
@@ -292,8 +292,9 @@ class DbxIndex {
         return events;
     }
 
-    handle_keydown(event: KeyboardEvent, store, entries: (DbxIndexEntry | null)[][]): { event_index: number; entry_index: number; maximized: boolean; file_info: boolean; } {
+    handle_keydown(event: KeyboardEvent, store, entries: (DbxIndexEntry | null)[][]): { new_store: { event_index: number; entry_index: number; maximized: boolean; file_info: boolean; }, updated: boolean } {
         let output: { event_index: number; entry_index: number; maximized: boolean; file_info: boolean; } = store;
+        let updated = false;
         const prevent_default = (event: KeyboardEvent) => {
             event.preventDefault();
             event.stopPropagation();
@@ -303,30 +304,35 @@ class DbxIndex {
                 output.event_index == 0 ?
                     null
                     :
-                    (output.event_index -= 1, output.entry_index = entries[output.event_index].length - 1)
+                    (output.event_index -= 1, output.entry_index = entries[output.event_index].length - 1, updated = true)
                 :
-                output.entry_index -= 1;
+                (output.entry_index -= 1, updated = true);
             prevent_default(event);
         } else if (event.key == "ArrowRight") {
             output.entry_index == entries[output.event_index]?.length - 1 ?
                 output.event_index == entries.length - 1 ?
                     null
                     :
-                    (output.event_index += 1, output.entry_index = 0)
+                    (output.event_index += 1, output.entry_index = 0, updated = true)
                 :
-                output.entry_index += 1;
+                (output.entry_index += 1, updated = true);
             prevent_default(event);
         } else if (event.key == "ArrowUp") {
             output.file_info = true;
+            updated = true;
             prevent_default(event);
         } else if (event.key == "ArrowDown") {
             output.file_info = false;
+            updated = true;
             prevent_default(event);
         } else if (event.key == " ") {
-            output.maximized = !output.maximized;
-            prevent_default(event);
+            if (output.event_index != -1 && output.entry_index != -1) {
+                output.maximized = !output.maximized;
+                updated = true;
+                prevent_default(event);
+            }
         }
 
-        return output;
+        return { new_store: output, updated };
     }
 }

@@ -9,12 +9,14 @@
     export let event_index: number;
     export let entry_index: number;
 
-    let isInView = false;
     let image_data: string = default_data;
 
     let full_image: string;
     let initial_image: string;
     let thumbnail: string;
+
+    let selected: boolean = false;
+    let maximized: boolean = false;
 
     const image = new DbxImage(image_entry.metadata.path);
     let calculated_dimensions: {
@@ -81,11 +83,24 @@
         observer.observe(element);
     });
     store.subscribe((store) => {
-        if (
+        selected =
             store.event_index == event_index &&
-            store.entry_index == entry_index
-        ) {
+            store.entry_index == entry_index;
+        // only if it is selected and maximized now
+        if (store.maximized && selected) {
+            maximized = true;
+        } else {
+            maximized = false;
+        }
+        if (selected) {
             element.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+        // if in the same or neighbouring events as selected and maximized or is currently selected and not maximized
+        if (
+            (store.maximized &&
+                Math.abs(store.event_index - event_index) <= 1) ||
+            selected
+        ) {
             full_image
                 ? (image_data = full_image)
                 : image.loadImage(ACCESS_TOKEN).then((data: string) => {
@@ -105,18 +120,26 @@
         class="{$store.event_index == event_index &&
         $store.entry_index == entry_index
             ? 'selected'
-            : ''} {calculated_dimensions.scale_class}"
+            : ''} {calculated_dimensions.scale_class} {maximized
+            ? 'maximized'
+            : ''}"
         on:load|once="{() => {
             URL.revokeObjectURL(image_data);
         }}"
         on:click="{() => {
-            store.update((previous) => {
-                previous.event_index = event_index;
-                previous.entry_index = entry_index;
-                return previous;
-            });
+            maximized
+                ? null
+                : store.update((previous) => {
+                      previous.event_index = event_index;
+                      previous.entry_index = entry_index;
+                      return previous;
+                  });
         }}"
-        style="top: {calculated_dimensions.top}%; left: {calculated_dimensions.left}%;"
+        style="top: {maximized
+            ? '0'
+            : calculated_dimensions.top}%; left: {maximized
+            ? '0'
+            : calculated_dimensions.left}%;"
     />
 </div>
 
@@ -132,16 +155,30 @@
         position: absolute;
         top: 0;
         left: 0;
-        height: 200px;
-        width: 200px;
+        height: 100%;
+        width: 100%;
         object-fit: contain;
         box-shadow: 3px 3px 10px black;
+    }
+    img:hover {
+        box-shadow: 6px 6px 15px black;
     }
     img.selected {
         border: 2px solid blue;
         border-radius: 2px;
         margin: -2px;
-        box-shadow: 6px 6px 15px black;
+        box-shadow: 6px 6px 20px black;
+    }
+    img.maximized {
+        position: fixed;
+        width: 100%;
+        height: 100%;
+        top: 0;
+        left: 0;
+        z-index: 1;
+        background-color: #222c;
+        border: none;
+        margin: 0px;
     }
     .width-auto {
         width: auto;

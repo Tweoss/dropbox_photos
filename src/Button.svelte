@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { cubicOut } from "svelte/easing";
     let show_button = true;
     (function (a) {
         if (
@@ -14,10 +15,18 @@
     let button_text = "Interact to enable video!";
     const clickHandler = () => {
         button_text = "Enabled!";
-        setTimeout(() => {
-            show_button = false;
-        }, 1000);
+        show_button = false;
     };
+    function hide_button(_, { duration }) {
+        return {
+            duration,
+            css: (t: number) => {
+                return `
+                transform: scale(${cubicOut(t)});
+                `;
+            },
+        };
+    }
 </script>
 
 <svelte:window
@@ -26,7 +35,9 @@
 />
 
 {#if show_button}
-    <button on:click="{clickHandler}">{button_text} </button>
+    <button on:click="{clickHandler}" out:hide_button="{{ duration: 1000 }}"
+        >{button_text}
+    </button>
 {/if}
 
 <style>

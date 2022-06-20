@@ -19,7 +19,7 @@
         .then(() => {
             console.log(index);
             // build index
-            index.build_index().then(() => {
+            index.build_index("/photos").then(() => {
                 // collapse video and images for live photos
                 index.collapse_index();
                 events_entries = index.get_sorted_event_array();
@@ -28,8 +28,16 @@
 </script>
 
 <svelte:window
-    on:keydown="{(e) =>
-        store.set(index.handle_keydown(e, get(store), events_entries))}"
+    on:keydown="{(e) => {
+        let { new_store, updated } = index.handle_keydown(
+            e,
+            get(store),
+            events_entries
+        );
+        if (updated) {
+            store.set(new_store);
+        }
+    }}"
 />
 
 <main>
@@ -38,7 +46,7 @@
         rel="stylesheet"
         href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/4.7.0/css/font-awesome.min.css"
     />
-    <h1>🐟 Photos 🐈</h1>
+    <h1>🐟Photos🐈</h1>
     <Button />
     {#each events_entries as event, event_index}
         <Event

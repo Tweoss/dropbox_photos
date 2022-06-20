@@ -10,7 +10,6 @@
 
     const timestamp = () => {
         let first = new Date(event_contents[0].metadata.time_taken);
-        console.log(first, event_contents[0].metadata.time_taken);
         let last = new Date(
             event_contents[event_contents.length - 1].metadata.time_taken
         );
@@ -62,7 +61,6 @@
 
 <div>
     <h2 class="timestamps">{timestamp()}</h2>
-    <!-- <h2 class="timestamps">{event_contents[0].metadata.last_modified}</h2> -->
     {#each event_contents as element, entry_index}
         {#if element.metadata.filetype == FileType.Image}
             {#if element.live_video_metadata}
