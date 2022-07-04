@@ -299,38 +299,53 @@ class DbxIndex {
             event.preventDefault();
             event.stopPropagation();
         };
-        if (event.key == "ArrowLeft") {
-            output.entry_index == 0 ?
-                output.event_index == 0 ?
-                    null
+        switch (event.key) {
+            case "ArrowLeft":
+                output.entry_index == 0 ?
+                    output.event_index == 0 ?
+                        null
+                        :
+                        (output.event_index -= 1, output.entry_index = entries[output.event_index].length - 1, updated = true)
                     :
-                    (output.event_index -= 1, output.entry_index = entries[output.event_index].length - 1, updated = true)
-                :
-                (output.entry_index -= 1, updated = true);
-            prevent_default(event);
-        } else if (event.key == "ArrowRight") {
-            output.entry_index == entries[output.event_index]?.length - 1 ?
-                output.event_index == entries.length - 1 ?
-                    null
+                    (output.entry_index -= 1, updated = true);
+                prevent_default(event);
+                break;
+            case "ArrowRight":
+                output.entry_index == entries[output.event_index]?.length - 1 ?
+                    output.event_index == entries.length - 1 ?
+                        null
+                        :
+                        (output.event_index += 1, output.entry_index = 0, updated = true)
                     :
-                    (output.event_index += 1, output.entry_index = 0, updated = true)
-                :
-                (output.entry_index += 1, updated = true);
-            prevent_default(event);
-        } else if (event.key == "ArrowUp") {
-            output.file_info = true;
-            updated = true;
-            prevent_default(event);
-        } else if (event.key == "ArrowDown") {
-            output.file_info = false;
-            updated = true;
-            prevent_default(event);
-        } else if (event.key == " ") {
-            if (output.event_index != -1 && output.entry_index != -1) {
-                output.maximized = !output.maximized;
+                    (output.entry_index += 1, updated = true);
+                prevent_default(event);
+                break;
+            case "ArrowUp":
+                output.file_info = true;
                 updated = true;
                 prevent_default(event);
-            }
+                break;
+            case "ArrowDown":
+                output.file_info = false;
+                updated = true;
+                prevent_default(event);
+                break;
+            case " ":
+                if (output.event_index != -1 && output.entry_index != -1) {
+                    output.maximized = !output.maximized;
+                    updated = true;
+                    prevent_default(event);
+                }
+                break;
+            case "Escape":
+                if (output.maximized) {
+                    output.maximized = false;
+                    updated = true;
+                    prevent_default(event);
+                }
+                break;
+            default:
+                break;
         }
 
         return { new_store: output, updated };
