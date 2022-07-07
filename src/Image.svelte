@@ -110,6 +110,10 @@
                   });
         }
     });
+    let drag = {
+        init: 0,
+        move: 0,
+    };
 </script>
 
 <div class="container">
@@ -126,7 +130,7 @@
         on:load|once="{() => {
             URL.revokeObjectURL(image_data);
         }}"
-        on:click="{() => {
+        on:click="{(e) => {
             maximized
                 ? null
                 : store.update((previous) => {
@@ -134,6 +138,35 @@
                       previous.entry_index = entry_index;
                       return previous;
                   });
+        }}"
+        on:dblclick="{() => {
+            maximized
+                ? store.update((previous) => {
+                      previous.maximized = false;
+                      return previous;
+                  })
+                : store.update((previous) => {
+                      previous.maximized = true;
+                      return previous;
+                  });
+        }}"
+        on:touchstart="{(e) => {
+            maximized ? (drag.init = e.touches[0].clientY) : null;
+        }}"
+        on:touchmove="{(e) => {
+            maximized ? (drag.move = e.touches[0].clientY) : null;
+        }}"
+        on:touchend="{() => {
+            if (!maximized) {
+                return;
+            }
+            const diff_y = drag.init - drag.move;
+            if (diff_y < -30) {
+                store.update((previous) => {
+                    previous.maximized = false;
+                    return previous;
+                });
+            }
         }}"
         style="top: {maximized
             ? '0'

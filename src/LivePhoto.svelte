@@ -117,13 +117,16 @@
                   });
         }
     });
+    let drag = {
+        init: 0,
+        move: 0,
+    };
 </script>
 
 <div class="container">
     <!-- svelte-ignore a11y-media-has-caption -->
     <video
         bind:this="{element}"
-        src="{video_data}"
         poster="{image_data}"
         class="{selected
             ? 'selected'
@@ -138,7 +141,14 @@
             maximized ? null : element.play();
         }}"
         on:mouseover="{() => {
-            maximized ? null : element.play().then(() => {}, () => {/* ignore the failure to play */});
+            maximized
+                ? null
+                : element.play().then(
+                      () => {},
+                      () => {
+                          /* ignore the failure to play */
+                      }
+                  );
         }}"
         on:mouseleave="{() => {
             if (!maximized) {
@@ -147,14 +157,44 @@
                 element.load();
             }
         }}"
-        on:click="{() => {
-            maximized
-                ? null
-                : store.update((previous) => {
+        on:click="{(e) => {
+            // prevent any passthrough
+            !maximized && e.target == element
+                ? store.update((previous) => {
                       previous.event_index = event_index;
                       previous.entry_index = entry_index;
                       return previous;
+                  })
+                : null;
+        }}"
+        on:dblclick="{() => {
+            maximized
+                ? store.update((previous) => {
+                      previous.maximized = false;
+                      return previous;
+                  })
+                : store.update((previous) => {
+                      previous.maximized = true;
+                      return previous;
                   });
+        }}"
+        on:touchstart="{(e) => {
+            maximized ? (drag.init = e.touches[0].clientY) : null;
+        }}"
+        on:touchmove="{(e) => {
+            maximized ? (drag.move = e.touches[0].clientY) : null;
+        }}"
+        on:touchend="{() => {
+            if (!maximized) {
+                return;
+            }
+            const diff_y = drag.init - drag.move;
+            if (diff_y < -30) {
+                store.update((previous) => {
+                    previous.maximized = false;
+                    return previous;
+                });
+            }
         }}"
         style="top: {maximized
             ? '0'
@@ -162,7 +202,9 @@
             ? '0'
             : calculated_dimensions.left}%;"
         controls="{maximized || null}"
+        playsinline
     >
+        <source src="{video_data}" type="video/mp4" />
         Sorry, your browser doesn't support embedded videos.
     </video>
 

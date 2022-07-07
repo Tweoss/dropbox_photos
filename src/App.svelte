@@ -25,6 +25,10 @@
                 events_entries = index.get_sorted_event_array();
             });
         });
+    let drag = {
+        init: 0,
+        move: 0,
+    }
 </script>
 
 <svelte:window
@@ -36,6 +40,35 @@
         );
         if (updated) {
             store.set(new_store);
+        }
+    }}"
+    on:touchstart="{(e) => {
+        drag.init = e.touches[0].clientX;
+    }}"
+    on:touchmove="{(e) => {
+        drag.move = e.touches[0].clientX;
+    }}"
+    on:touchend="{() => {
+        const diff_x = drag.init - drag.move;
+        const fire = (key) => {
+            let { new_store, updated } = index.handle_keydown(
+                new KeyboardEvent('keydown', {
+                    key,
+                }),
+                get(store),
+                events_entries
+            );
+            if (updated) {
+                store.set(new_store);
+            }
+        };
+
+        if (diff_x > 100) {
+            fire('ArrowRight');
+            return;
+        } else if (diff_x < -100) {
+            fire('ArrowLeft');
+            return;
         }
     }}"
 />
